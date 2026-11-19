@@ -1,10 +1,35 @@
 # ES8336 jack fix for Huawei MateBook D16 (AMD 4600H)
 
 Build the patched `snd-acp-legacy-mach.ko` for the **running Fedora kernel**.
+
+## Automated install
+
+Install the required tools and matching kernel headers, then run:
+
+```sh
+sudo dnf install rpm-build rpmdevtools koji gcc make patch openssl mokutil "kernel-devel-$(uname -r)"
+make install
+```
+
+The Makefile selects the source RPM for the running kernel,
+builds and signs the module, and requests MOK enrollment if needed. Reboot
+to finish enrollment and load the module. Intermediate files are reused on
+subsequent runs.
+
+To restore Fedora's module, run:
+
+```sh
+make remove
+```
+
+Reboot to load the packaged module.
+
+## Manual build
+
 The commands below use `7.3.3-200.fc44` as the source RPM version; use the
 corresponding version if `uname -r` differs. Run the build as your normal user.
 
-## Prerequisites
+### Prerequisites
 
 ```sh
 export kernel_release=$(uname -r)
@@ -17,9 +42,7 @@ rpm -Uvh "${kernel_build}.src.rpm"
 sudo dnf builddep ~/rpmbuild/SPECS/kernel.spec
 ```
 
-**TODO**
-
-## Apply the patch
+### Apply the patch
 
 Run this section from the repository root. `%prep` creates a fresh source tree
 and applies Fedora's patches without building the kernel. Rerun it if an older
@@ -44,7 +67,7 @@ patch --batch -d "$kernel_src" -p1 < "$repo_dir/es8336-jack.patch"
 The `cmp` check ensures that the patch's original file matches Fedora's
 prepared source. Apply the patch only once to a fresh tree.
 
-## Build the module
+### Build the module
 
 `acp3x-es83xx.c` is part of `snd-acp-legacy-mach.ko`, so build the complete
 module against the matching `kernel-devel` package:
@@ -68,7 +91,7 @@ modinfo -F vermagic "$module_dir/snd-acp-legacy-mach.ko"
 
 The `vermagic` output must start with `uname -r`.
 
-## Secure Boot: enroll a key once
+### Secure Boot: enroll a key once
 
 Secure Boot is enabled on this laptop. Keep the private key outside the
 repository and reuse it to sign later module builds.
@@ -90,7 +113,7 @@ Reboot, select **Enroll MOK** in MOK Manager, and enter the password set by
 list. `mokutil --test-key` can report a kernel keyring access error even when
 the certificate is enrolled, so do not use its exit code as the signing gate.
 
-## Sign and install
+### Sign and install
 
 ```sh
 export key_dir=~/mydevel/secureboot
