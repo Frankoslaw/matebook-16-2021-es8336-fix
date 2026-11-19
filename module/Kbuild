@@ -1,0 +1,2 @@
+obj-m := snd-acp-legacy-mach.o
+snd-acp-legacy-mach-y := acp-legacy-mach.o acp3x-es83xx/acp3x-es83xx.o

@@ -1,36 +1,27 @@
 # ES8336 headphone jack fix for Huawei MateBook D16
 
-This patch adds a headphone GPIO polarity quirk for the ES8336 audio driver on supported Huawei MateBook models, including the HVY-WXX9 M1010. It aims to fix silent headphone jack output through a replacement `snd-acp-legacy-mach` kernel module for Fedora.
+This akmod replaces `snd-acp-legacy-mach` with a version that sets the headphone GPIO polarity for the BOM-WXX9 and HVY-WXX9 M1010. It is based on Fedora kernel 7.3.4 sources. Akmods rebuilds it for installed kernel updates and signs each build with its local key.
 
-## Automated install
+## Install (Fedora Workstation)
 
-Install the prerequisites in [GUIDE.md](GUIDE.md), then run `make install`.
-It fetches source for the running Fedora kernel, builds and signs the module,
-requests MOK enrollment if needed, and installs it. Reboot to enroll the key
-and load the module. Run `make remove` and reboot to restore Fedora's module.
+```sh
+sudo dnf install akmods kmodtool mokutil "kernel-devel-$(uname -r)"
+sudo kmodgenca -a
+sudo mokutil --import /etc/pki/akmods/certs/public_key.der
+make install
+```
 
-Available commands: `make check`, `make source`, `make build`, `make sign`,
-`make enroll`, `make install` (the default), and `make remove`. The Makefile
-reuses existing build files and signing keys. Set a different key directory
-with `make KEY_DIR=/path install`.
+`make install` builds the RPMs, installs them, and builds the module for the running kernel. The package installs `/etc/depmod.d/es8336-jack.conf` with `override snd-acp-legacy-mach * extra/es8336-jack`, which tells depmod to prefer the akmod over Fedora's module for each kernel. Check the selected path before rebooting:
 
-## Manual build
+```sh
+modinfo -n snd-acp-legacy-mach
+modinfo -F signer snd-acp-legacy-mach
+```
 
-See [GUIDE.md](GUIDE.md) for the step-by-step build and installation commands.
+The path should contain `/extra/es8336-jack/`. Reboot and choose **Enroll MOK** in the firmware's MOK Manager, using the password from `mokutil`. Reboot again to load the signed replacement. The key enrollment is a one-time step; subsequent kernel updates rebuild and sign automatically.
 
-## Author
+If `akmods` reports a build failure after a future kernel update, inspect `/var/cache/akmods/es8336-jack/` and update the bundled driver sources for that kernel. Akmods cannot guarantee compatibility when Fedora changes the driver or its kernel interfaces.
 
-Franciszek Łopuszański
+To remove the replacement, run `make remove`, then reboot. This removes the RPMs and the packaged depmod priority rule.
 
-## References
-
-### Fedora kernel source
-
-- [Building a custom kernel from a source RPM](https://fedoraproject.org/wiki/Building_a_custom_kernel/Source_RPM)
-- [Fedora/ARK kernel repository layout](https://cki-project.gitlab.io/kernel-ark/repository-layout.html)
-
-### ES8336 and Huawei audio
-
-- [SOF Linux issue #3249](https://github.com/thesofproject/linux/issues/3249)
-- [Huawei MateBook AMD sound support](https://github.com/codepayne/linux-sound-huawei)
-- [Huawei MateBook 14 headphone jack fix](https://github.com/Xellanox/Huawei-Matebook-14-Audio)
+The original patch is in [es8336-jack.patch](es8336-jack.patch). The four other bundled source files and the original driver file came from Fedora kernel 7.3.4-200.fc44; the patched driver is in `module/acp3x-es83xx/acp3x-es83xx.c`.
